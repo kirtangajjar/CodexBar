@@ -20,6 +20,12 @@ enum CostUsagePricing {
         let cacheReadInputCostPerTokenAboveThreshold: Double?
     }
 
+    struct GeminiPricing: Sendable {
+        let inputCostPerToken: Double
+        let outputCostPerToken: Double
+        let cacheReadInputCostPerToken: Double
+    }
+
     private static let codex: [String: CodexPricing] = [
         "gpt-5": CodexPricing(
             inputCostPerToken: 1.25e-6,
@@ -164,6 +170,33 @@ enum CostUsagePricing {
             cacheReadInputCostPerTokenAboveThreshold: 6e-7),
     ]
 
+    private static let gemini: [String: GeminiPricing] = [
+        "gemini-1.5-flash": GeminiPricing(
+            inputCostPerToken: 7.5e-8, // $0.075 / 1M
+            outputCostPerToken: 3e-7, // $0.30 / 1M
+            cacheReadInputCostPerToken: 1.875e-8), // $0.01875 / 1M
+        "gemini-1.5-flash-8b": GeminiPricing(
+            inputCostPerToken: 3.75e-8, // $0.0375 / 1M
+            outputCostPerToken: 1.5e-7, // $0.15 / 1M
+            cacheReadInputCostPerToken: 1e-8),
+        "gemini-1.5-pro": GeminiPricing(
+            inputCostPerToken: 1.25e-6, // $1.25 / 1M
+            outputCostPerToken: 5e-6, // $5.00 / 1M
+            cacheReadInputCostPerToken: 3.125e-7), // $0.3125 / 1M
+        "gemini-2.0-flash": GeminiPricing(
+            inputCostPerToken: 1e-7, // $0.10 / 1M
+            outputCostPerToken: 4e-7, // $0.40 / 1M
+            cacheReadInputCostPerToken: 2.5e-8),
+        "gemini-2.0-flash-lite": GeminiPricing(
+            inputCostPerToken: 7.5e-8,
+            outputCostPerToken: 3e-7,
+            cacheReadInputCostPerToken: 1.875e-8),
+        "gemini-2.0-pro": GeminiPricing(
+            inputCostPerToken: 1.25e-6,
+            outputCostPerToken: 5e-6,
+            cacheReadInputCostPerToken: 3.125e-7),
+    ]
+
     static func normalizeCodexModel(_ raw: String) -> String {
         var trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("openai/") {
@@ -205,6 +238,22 @@ enum CostUsagePricing {
         return trimmed
     }
 
+    static func normalizeGeminiModel(_ raw: String) -> String {
+        var trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if trimmed.hasPrefix("google/") {
+            trimmed = String(trimmed.dropFirst("google/".count))
+        }
+        // User examples: gemini-3-flash-preview, gemini-3.1-pro-preview
+        if trimmed.contains("flash") {
+            if trimmed.contains("pro") { return "gemini-1.5-pro" }
+            return "gemini-1.5-flash"
+        }
+        if trimmed.contains("pro") {
+            return "gemini-1.5-pro"
+        }
+        return trimmed
+    }
+
     static func codexCostUSD(model: String, inputTokens: Int, cachedInputTokens: Int, outputTokens: Int) -> Double? {
         let key = self.normalizeCodexModel(model)
         guard let pricing = self.codex[key] else { return nil }
@@ -213,6 +262,31 @@ enum CostUsagePricing {
         return Double(nonCached) * pricing.inputCostPerToken
             + Double(cached) * pricing.cacheReadInputCostPerToken
             + Double(max(0, outputTokens)) * pricing.outputCostPerToken
+    }
+
+    static func geminiCostUSD(model: String, inputTokens: Int, cachedInputTokens: Int, outputTokens: Int) -> Double? {
+        let key = self.normalizeGeminiModel(model)
+        guard let pricing = self.getGeminiPricing(key) else { return nil }
+        let cached = min(max(0, cachedInputTokens), max(0, inputTokens))
+        let nonCached = max(0, inputTokens - cached)
+        return Double(nonCached) * pricing.inputCostPerToken
+            + Double(cached) * pricing.cacheReadInputCostPerToken
+            + Double(max(0, outputTokens)) * pricing.outputCostPerToken
+    }
+
+    static func geminiSavingsUSD(model: String, cachedInputTokens: Int) -> Double? {
+        let key = self.normalizeGeminiModel(model)
+        guard let pricing = self.getGeminiPricing(key) else { return nil }
+        // Savings = what it WOULD have cost (input rate) - what it ACTUALLY cost (cache rate)
+        let rateDelta = pricing.inputCostPerToken - pricing.cacheReadInputCostPerToken
+        return Double(max(0, cachedInputTokens)) * rateDelta
+    }
+
+    private static func getGeminiPricing(_ key: String) -> GeminiPricing? {
+        if let p = self.gemini[key] { return p }
+        if key.contains("pro") { return self.gemini["gemini-1.5-pro"] }
+        if key.contains("flash") { return self.gemini["gemini-1.5-flash"] }
+        return nil
     }
 
     static func claudeCostUSD(

@@ -26,7 +26,7 @@ public struct CostUsageFetcher: Sendable {
         forceRefresh: Bool = false,
         allowVertexClaudeFallback: Bool = false) async throws -> CostUsageTokenSnapshot
     {
-        guard provider == .codex || provider == .claude || provider == .vertexai else {
+        guard provider == .codex || provider == .claude || provider == .vertexai || provider == .gemini || provider == .jules else {
             throw CostUsageError.unsupportedProvider(provider)
         }
 
@@ -87,6 +87,11 @@ public struct CostUsageFetcher: Sendable {
         let totalFromSummary = daily.summary?.totalCostUSD
         let totalFromEntries = daily.data.compactMap(\.costUSD).reduce(0, +)
         let last30DaysCostUSD = totalFromSummary ?? (totalFromEntries > 0 ? totalFromEntries : nil)
+
+        let savingsFromSummary = daily.summary?.totalSavingsUSD
+        let savingsFromEntries = daily.data.compactMap(\.savingsUSD).reduce(0, +)
+        let last30DaysSavingsUSD = savingsFromSummary ?? (savingsFromEntries > 0 ? savingsFromEntries : nil)
+
         let totalTokensFromSummary = daily.summary?.totalTokens
         let totalTokensFromEntries = daily.data.compactMap(\.totalTokens).reduce(0, +)
         let last30DaysTokens = totalTokensFromSummary ?? (totalTokensFromEntries > 0 ? totalTokensFromEntries : nil)
@@ -94,8 +99,10 @@ public struct CostUsageFetcher: Sendable {
         return CostUsageTokenSnapshot(
             sessionTokens: currentDay?.totalTokens,
             sessionCostUSD: currentDay?.costUSD,
+            sessionSavingsUSD: currentDay?.savingsUSD,
             last30DaysTokens: last30DaysTokens,
             last30DaysCostUSD: last30DaysCostUSD,
+            last30DaysSavingsUSD: last30DaysSavingsUSD,
             daily: daily.data,
             updatedAt: now)
     }

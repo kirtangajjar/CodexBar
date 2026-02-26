@@ -1552,11 +1552,13 @@ extension UsageStore {
         self.lastTokenFetchAt.removeAll()
         self.tokenFailureGates[.codex]?.reset()
         self.tokenFailureGates[.claude]?.reset()
+        self.tokenFailureGates[.gemini]?.reset()
+        self.tokenFailureGates[.jules]?.reset()
         return nil
     }
 
     private func refreshTokenUsage(_ provider: UsageProvider, force: Bool) async {
-        guard provider == .codex || provider == .claude || provider == .vertexai else {
+        guard provider == .codex || provider == .claude || provider == .vertexai || provider == .gemini || provider == .jules else {
             self.tokenSnapshots.removeValue(forKey: provider)
             self.tokenErrors[provider] = nil
             self.tokenFailureGates[provider]?.reset()

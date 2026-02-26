@@ -10,6 +10,7 @@ enum CostUsageScanner {
     struct Options: Sendable {
         var codexSessionsRoot: URL?
         var claudeProjectsRoots: [URL]?
+        var geminiTmpRoot: URL?
         var cacheRoot: URL?
         var refreshMinIntervalSeconds: TimeInterval = 60
         var claudeLogProviderFilter: ClaudeLogProviderFilter = .all
@@ -19,12 +20,14 @@ enum CostUsageScanner {
         init(
             codexSessionsRoot: URL? = nil,
             claudeProjectsRoots: [URL]? = nil,
+            geminiTmpRoot: URL? = nil,
             cacheRoot: URL? = nil,
             claudeLogProviderFilter: ClaudeLogProviderFilter = .all,
             forceRescan: Bool = false)
         {
             self.codexSessionsRoot = codexSessionsRoot
             self.claudeProjectsRoots = claudeProjectsRoots
+            self.geminiTmpRoot = geminiTmpRoot
             self.cacheRoot = cacheRoot
             self.claudeLogProviderFilter = claudeLogProviderFilter
             self.forceRescan = forceRescan
@@ -64,13 +67,15 @@ enum CostUsageScanner {
             return self.loadCodexDaily(range: range, now: now, options: options)
         case .claude:
             return self.loadClaudeDaily(provider: .claude, range: range, now: now, options: options)
+        case .gemini, .jules:
+            return self.loadGeminiDaily(range: range, now: now, options: options)
         case .vertexai:
             var filtered = options
             if filtered.claudeLogProviderFilter == .all {
                 filtered.claudeLogProviderFilter = .vertexAIOnly
             }
             return self.loadClaudeDaily(provider: .vertexai, range: range, now: now, options: filtered)
-        case .zai, .gemini, .antigravity, .cursor, .opencode, .factory, .copilot, .minimax, .kiro, .kimi, .kimik2,
+        case .zai, .antigravity, .cursor, .opencode, .factory, .copilot, .minimax, .kiro, .kimi, .kimik2,
              .augment, .jetbrains, .amp, .ollama, .synthetic, .openrouter, .warp:
             return emptyReport
         }

@@ -50,6 +50,7 @@ struct UsageMenuCardView: View {
         struct TokenUsageSection: Sendable {
             let sessionLine: String
             let monthLine: String
+            let savingsLine: String?
             let hintLine: String?
             let errorLine: String?
             let errorCopyText: String?
@@ -157,6 +158,11 @@ struct UsageMenuCardView: View {
                                 .font(.footnote)
                             Text(tokenUsage.monthLine)
                                 .font(.footnote)
+                            if let savings = tokenUsage.savingsLine, !savings.isEmpty {
+                                Text(savings)
+                                    .font(.footnote)
+                                    .foregroundStyle(MenuHighlightStyle.secondary(self.isHighlighted))
+                            }
                             if let hint = tokenUsage.hintLine, !hint.isEmpty {
                                 Text(hint)
                                     .font(.footnote)
@@ -981,7 +987,7 @@ extension UsageMenuCardView.Model {
         snapshot: CostUsageTokenSnapshot?,
         error: String?) -> TokenUsageSection?
     {
-        guard provider == .codex || provider == .claude || provider == .vertexai else { return nil }
+        guard provider == .codex || provider == .claude || provider == .vertexai || provider == .gemini else { return nil }
         guard enabled else { return nil }
         guard let snapshot else { return nil }
 
@@ -1004,10 +1010,19 @@ extension UsageMenuCardView.Model {
             }
             return "Last 30 days: \(monthCost)"
         }()
+
+        var savingsLine: String? = nil
+        if let monthSavings = snapshot.last30DaysSavingsUSD, monthSavings >= 0.01 {
+            let sessionSavings = snapshot.sessionSavingsUSD.map { UsageFormatter.usdString($0) } ?? "—"
+            let monthSavingsText = UsageFormatter.usdString(monthSavings)
+            savingsLine = "Saved: \(sessionSavings) today · \(monthSavingsText) total"
+        }
+
         let err = (error?.isEmpty ?? true) ? nil : error
         return TokenUsageSection(
             sessionLine: sessionLine,
             monthLine: monthLine,
+            savingsLine: savingsLine,
             hintLine: nil,
             errorLine: err,
             errorCopyText: (error?.isEmpty ?? true) ? nil : error)

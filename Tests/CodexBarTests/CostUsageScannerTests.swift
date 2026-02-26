@@ -892,6 +892,68 @@ struct CostUsageScannerTests {
         #expect(scanned[1].bytes.isEmpty)
         #expect(scanned[1].wasTruncated == true)
     }
+
+    @Test
+    func geminiDailyReportParsesSessionFiles() throws {
+        let env = try CostUsageTestEnvironment()
+        defer { env.cleanup() }
+
+        let day = try env.makeLocalNoon(year: 2025, month: 12, day: 20)
+        let iso0 = env.isoString(for: day)
+
+        let session: [String: Any] = [
+            "sessionId": "sess-gem-1",
+            "startTime": iso0,
+            "messages": [
+                [
+                    "type": "gemini",
+                    "model": "gemini-1.5-pro",
+                    "tokens": [
+                        "input": 1000,
+                        "output": 200,
+                        "cached": 500,
+                    ],
+                ],
+                [
+                    "type": "user",
+                    "content": "hello",
+                ],
+                [
+                    "type": "gemini",
+                    "model": "gemini-1.5-flash",
+                    "tokens": [
+                        "input": 500,
+                        "output": 100,
+                        "cached": 0,
+                    ],
+                ],
+            ],
+        ]
+
+        _ = try env.writeGeminiSessionFile(
+            project: "project-x",
+            filename: "session-1.json",
+            contents: env.json(session))
+
+        var options = CostUsageScanner.Options(
+            cacheRoot: env.cacheRoot)
+        options.geminiTmpRoot = env.geminiTmpRoot
+        options.refreshMinIntervalSeconds = 0
+
+        let report = CostUsageScanner.loadDailyReport(
+            provider: .gemini,
+            since: day,
+            until: day,
+            now: day,
+            options: options)
+
+        #expect(report.data.count == 1)
+        #expect(report.data[0].modelsUsed?.sorted() == ["gemini-1.5-flash", "gemini-1.5-pro"])
+        #expect(report.data[0].inputTokens == 1500)
+        #expect(report.data[0].outputTokens == 300)
+        #expect(report.data[0].totalTokens == 1800)
+        #expect((report.data[0].costUSD ?? 0) > 0)
+    }
 }
 
 private struct CostUsageTestEnvironment {
@@ -901,6 +963,7 @@ private struct CostUsageTestEnvironment {
     let codexSessionsRoot: URL
     let codexArchivedSessionsRoot: URL
     let claudeProjectsRoot: URL
+    let geminiTmpRoot: URL
 
     init() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -914,10 +977,12 @@ private struct CostUsageTestEnvironment {
         self.codexArchivedSessionsRoot = self.codexHomeRoot
             .appendingPathComponent("archived_sessions", isDirectory: true)
         self.claudeProjectsRoot = root.appendingPathComponent("claude-projects", isDirectory: true)
+        self.geminiTmpRoot = root.appendingPathComponent("gemini-tmp", isDirectory: true)
         try FileManager.default.createDirectory(at: self.cacheRoot, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: self.codexSessionsRoot, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: self.codexArchivedSessionsRoot, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: self.claudeProjectsRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: self.geminiTmpRoot, withIntermediateDirectories: true)
     }
 
     func cleanup() {
@@ -968,6 +1033,15 @@ private struct CostUsageTestEnvironment {
         return url
     }
 
+    func writeGeminiSessionFile(project: String, filename: String, contents: String) throws -> URL {
+        let dir = self.geminiTmpRoot.appendingPathComponent(project, isDirectory: true)
+            .appendingPathComponent("chats", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent(filename, isDirectory: false)
+        try contents.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
     func writeCodexArchivedSessionFile(filename: String, contents: String) throws -> URL {
         let url = self.codexArchivedSessionsRoot.appendingPathComponent(filename, isDirectory: false)
         try contents.write(to: url, atomically: true, encoding: .utf8)
@@ -983,5 +1057,13 @@ private struct CostUsageTestEnvironment {
             return text
         }
         return lines.joined(separator: "\n") + "\n"
+    }
+
+    func json(_ object: Any) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted])
+        guard let text = String(bytes: data, encoding: .utf8) else {
+            throw NSError(domain: "CostUsageTestEnvironment", code: 2)
+        }
+        return text
     }
 }

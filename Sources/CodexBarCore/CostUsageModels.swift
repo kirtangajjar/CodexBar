@@ -3,23 +3,29 @@ import Foundation
 public struct CostUsageTokenSnapshot: Sendable, Equatable {
     public let sessionTokens: Int?
     public let sessionCostUSD: Double?
+    public let sessionSavingsUSD: Double?
     public let last30DaysTokens: Int?
     public let last30DaysCostUSD: Double?
+    public let last30DaysSavingsUSD: Double?
     public let daily: [CostUsageDailyReport.Entry]
     public let updatedAt: Date
 
     public init(
         sessionTokens: Int?,
         sessionCostUSD: Double?,
+        sessionSavingsUSD: Double? = nil,
         last30DaysTokens: Int?,
         last30DaysCostUSD: Double?,
+        last30DaysSavingsUSD: Double? = nil,
         daily: [CostUsageDailyReport.Entry],
         updatedAt: Date)
     {
         self.sessionTokens = sessionTokens
         self.sessionCostUSD = sessionCostUSD
+        self.sessionSavingsUSD = sessionSavingsUSD
         self.last30DaysTokens = last30DaysTokens
         self.last30DaysCostUSD = last30DaysCostUSD
+        self.last30DaysSavingsUSD = last30DaysSavingsUSD
         self.daily = daily
         self.updatedAt = updatedAt
     }
@@ -29,11 +35,14 @@ public struct CostUsageDailyReport: Sendable, Decodable {
     public struct ModelBreakdown: Sendable, Decodable, Equatable {
         public let modelName: String
         public let costUSD: Double?
+        public let savingsUSD: Double?
 
         private enum CodingKeys: String, CodingKey {
             case modelName
             case costUSD
             case cost
+            case savingsUSD
+            case savings
         }
 
         public init(from decoder: Decoder) throws {
@@ -42,11 +51,15 @@ public struct CostUsageDailyReport: Sendable, Decodable {
             self.costUSD =
                 try container.decodeIfPresent(Double.self, forKey: .costUSD)
                 ?? container.decodeIfPresent(Double.self, forKey: .cost)
+            self.savingsUSD =
+                try container.decodeIfPresent(Double.self, forKey: .savingsUSD)
+                ?? container.decodeIfPresent(Double.self, forKey: .savings)
         }
 
-        public init(modelName: String, costUSD: Double?) {
+        public init(modelName: String, costUSD: Double?, savingsUSD: Double? = nil) {
             self.modelName = modelName
             self.costUSD = costUSD
+            self.savingsUSD = savingsUSD
         }
     }
 
@@ -58,6 +71,7 @@ public struct CostUsageDailyReport: Sendable, Decodable {
         public let outputTokens: Int?
         public let totalTokens: Int?
         public let costUSD: Double?
+        public let savingsUSD: Double?
         public let modelsUsed: [String]?
         public let modelBreakdowns: [ModelBreakdown]?
 
@@ -72,6 +86,8 @@ public struct CostUsageDailyReport: Sendable, Decodable {
             case totalTokens
             case costUSD
             case totalCost
+            case savingsUSD
+            case totalSavings
             case modelsUsed
             case models
             case modelBreakdowns
@@ -92,6 +108,9 @@ public struct CostUsageDailyReport: Sendable, Decodable {
             self.costUSD =
                 try container.decodeIfPresent(Double.self, forKey: .costUSD)
                 ?? container.decodeIfPresent(Double.self, forKey: .totalCost)
+            self.savingsUSD =
+                try container.decodeIfPresent(Double.self, forKey: .savingsUSD)
+                ?? container.decodeIfPresent(Double.self, forKey: .totalSavings)
             self.modelsUsed = Self.decodeModelsUsed(from: container)
             self.modelBreakdowns = try container.decodeIfPresent([ModelBreakdown].self, forKey: .modelBreakdowns)
         }
@@ -104,6 +123,7 @@ public struct CostUsageDailyReport: Sendable, Decodable {
             cacheCreationTokens: Int? = nil,
             totalTokens: Int?,
             costUSD: Double?,
+            savingsUSD: Double? = nil,
             modelsUsed: [String]?,
             modelBreakdowns: [ModelBreakdown]?)
         {
@@ -114,6 +134,7 @@ public struct CostUsageDailyReport: Sendable, Decodable {
             self.cacheCreationTokens = cacheCreationTokens
             self.totalTokens = totalTokens
             self.costUSD = costUSD
+            self.savingsUSD = savingsUSD
             self.modelsUsed = modelsUsed
             self.modelBreakdowns = modelBreakdowns
         }
@@ -143,6 +164,7 @@ public struct CostUsageDailyReport: Sendable, Decodable {
         public let cacheCreationTokens: Int?
         public let totalTokens: Int?
         public let totalCostUSD: Double?
+        public let totalSavingsUSD: Double?
 
         private enum CodingKeys: String, CodingKey {
             case totalInputTokens
@@ -154,6 +176,8 @@ public struct CostUsageDailyReport: Sendable, Decodable {
             case totalTokens
             case totalCostUSD
             case totalCost
+            case totalSavingsUSD
+            case totalSavings
         }
 
         public init(
@@ -162,7 +186,8 @@ public struct CostUsageDailyReport: Sendable, Decodable {
             cacheReadTokens: Int? = nil,
             cacheCreationTokens: Int? = nil,
             totalTokens: Int?,
-            totalCostUSD: Double?)
+            totalCostUSD: Double?,
+            totalSavingsUSD: Double? = nil)
         {
             self.totalInputTokens = totalInputTokens
             self.totalOutputTokens = totalOutputTokens
@@ -170,6 +195,7 @@ public struct CostUsageDailyReport: Sendable, Decodable {
             self.cacheCreationTokens = cacheCreationTokens
             self.totalTokens = totalTokens
             self.totalCostUSD = totalCostUSD
+            self.totalSavingsUSD = totalSavingsUSD
         }
 
         public init(from decoder: Decoder) throws {
@@ -186,6 +212,9 @@ public struct CostUsageDailyReport: Sendable, Decodable {
             self.totalCostUSD =
                 try container.decodeIfPresent(Double.self, forKey: .totalCostUSD)
                 ?? container.decodeIfPresent(Double.self, forKey: .totalCost)
+            self.totalSavingsUSD =
+                try container.decodeIfPresent(Double.self, forKey: .totalSavingsUSD)
+                ?? container.decodeIfPresent(Double.self, forKey: .totalSavings)
         }
     }
 
